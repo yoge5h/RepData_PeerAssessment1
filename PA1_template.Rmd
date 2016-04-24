@@ -1,25 +1,149 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "PA1_template.Rmd"
+author: "Yogesh Adhikari"
+date: "April 23, 2016"
+output: html_document
 ---
 
+It is now possible to collect a large amount of data about personal movement using activity monitoring devices such as a Fitbit, Nike Fuelband, or Jawbone Up. These type of devices are part of the "quantified self" movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. But these data remain under-utilized both because the raw data are hard to obtain and there is a lack of statistical methods and software for processing and interpreting the data.
 
-## Loading and preprocessing the data
+This report makes use of data from a personal activity monitoring device. This device collects data at 5 minute intervals through out the day. The data consists of two months of data from an anonymous individual collected during the months of October and November, 2012 and include the number of steps taken in 5 minute intervals each day.
 
-
-
-## What is mean total number of steps taken per day?
-
+The data for the research can be downloaded from [download data](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip)
 
 
-## What is the average daily activity pattern?
+##Loading the data
 
+
+### 1. Downloading the data
+
+```{r}
+if(!file.exists("ActivityData.zip")){
+    download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip",destfile = "ActivityData.zip")
+    unzip("ActivityData.zip")
+}
+```
+
+### 2. Loading the data into R
+```{r}
+data = read.csv("activity.csv",header = T)
+```
+
+### 3. Preprocessing the data
+```{r}
+activityData = data[!is.na(data$steps),]
+activityData$date = as.Date(activityData$date,format = "%Y-%m-%d")
+```
+
+
+## Answering what is mean total number of steps taken per day.
+
+
+### 1. Calculating the total no of steps taken in a day
+```{r}
+stepsByDate = aggregate(x = activityData[c("steps")],
+                        FUN = sum, by=list(date = activityData$date),
+                        na.action=NULL)
+head(stepsByDate)
+```
+
+### 2. Histogram plot of no of steps
+```{r, echo=FALSE}
+hist(stepsByDate$steps,breaks=20,main="Plot of Steps per day"
+     ,xlab = "Steps",ylab = "Frequency")
+```
+
+### 3. Calculating the central values of steps
+```{r}
+mean(stepsByDate$steps,na.rm=T)
+median(stepsByDate$steps,na.rm=T)
+```
+
+
+## Answering what is the average daily activity pattern.
+
+
+### 1. Plotting time series plot of interval vs steps.
+```{r, ECHO=FALSE}
+stepsByInterval = aggregate(x = activityData[c("steps")],
+                            by=list(Interval = activityData$interval),
+                            FUN = mean
+                            )
+
+plot(stepsByInterval$Interval,stepsByInterval$steps,type = "l",xlab = "Interval",ylab = "Steps", main = "Plot of time series interval vs steps")
+```
+
+### 3. Calculating maximum steps at interval
+
+```{r}
+stepsByInterval[which.max(stepsByInterval$steps),]
+```
 
 
 ## Imputing missing values
 
 
+### 1. Calculating no of obserations with NA steps
 
-## Are there differences in activity patterns between weekdays and weekends?
+```{r}
+nrow(data[is.na(data$steps),])
+```
+
+### 2. Creating a dataset with NAs replaced by mean
+
+```{r}
+dataAll = data
+nas = is.na(dataAll$steps)
+avgByInterval = tapply(dataAll$steps, dataAll$interval, mean, na.rm=TRUE, simplify=TRUE)
+dataAll$steps[nas] = avgByInterval[as.character(dataAll$interval[nas])]
+```
+
+### 3. Repeating the above process with new data
+```{r}
+stepsByDateAll = aggregate(x = dataAll[c("steps")],
+                        FUN = sum, by=list(date = dataAll$date),
+                        na.action=NULL)
+head(stepsByDateAll)
+```
+```{r, echo=FALSE}
+hist(stepsByDateAll$steps,breaks=20,main="Plot of Steps per day"
+     ,xlab = "Steps",ylab = "Frequency")
+```
+
+```{r}
+mean(stepsByDateAll$steps,na.rm=T)
+median(stepsByDateAll$steps,na.rm=T)
+```
+
+Hence, after imputation the values of both mean and median converges to be the same i.e. 10766.19
+
+
+## Answering are there differences in activity patterns between weekdays and weekends
+
+### 1. Adding a new column day in the dataset
+
+```{r}
+dataAll$day = ifelse(weekdays(as.Date(dataAll$date,"%Y-%m-%d")) == "Saturday" | weekdays(as.Date(dataAll$date,"%Y-%m-%d")) == "Sunday","Weekend","Weekday")
+
+head(dataAll)
+```
+
+### 2. Plotting the data separated by days of week i.e a weekday or a weekend
+```{r}
+stepsByInterval = aggregate(x = dataAll[c("steps")],
+                            by=list(Interval = dataAll$interval,day = dataAll$day),
+                            FUN = mean
+                            )
+
+head(stepsByInterval)
+```
+```{r, ECHO=FALSE}
+library(ggplot2)
+plot = ggplot(stepsByInterval,aes(x = Interval, y = steps))
+plot + geom_line()+ 
+    facet_grid(day~.)+ 
+    labs(x="Interval", y="Steps")+ 
+   labs(title="Steps by interval; divided according to day of week.")
+```
+
+From the plots we see that during the weekdays, activity is seen during early time frames after which the activiyies are substancially reduced. Whereas, during weekends activity is seen throughout the day.
